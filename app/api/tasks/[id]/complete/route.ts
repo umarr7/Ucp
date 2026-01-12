@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { withAuth } from '@/lib/middleware';
 import { addPoints, addReputation, preventPointFarming, POINTS_CONFIG, REPUTATION_CONFIG } from '@/lib/points';
 
-export const POST = withAuth(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const POST = withAuth(async (req: any, { params }: { params: { id: string } }) => {
   try {
     const userId = req.user!.userId;
     const task = await prisma.task.findUnique({
@@ -56,7 +56,8 @@ export const POST = withAuth(async (req: NextRequest, { params }: { params: { id
         task.rewardPoints,
         'TASK_COMPLETED',
         `Completed task: ${task.title}`,
-        task.id
+        task.id,
+        tx
       );
 
       // Award reputation to acceptor
@@ -65,8 +66,19 @@ export const POST = withAuth(async (req: NextRequest, { params }: { params: { id
         REPUTATION_CONFIG.FOR_TASK_COMPLETION,
         'TASK_COMPLETED',
         `Completed task: ${task.title}`,
-        task.id
+        task.id,
+        undefined,
+        tx
       );
+      // Send completion message
+      await tx.message.create({
+        data: {
+          taskId: task.id,
+          senderId: task.acceptorId!,
+          receiverId: task.requesterId,
+          content: `✅ I have marked this task as completed. Points should be transferred shortly!`,
+        },
+      });
     });
 
     const updatedTask = await prisma.task.findUnique({

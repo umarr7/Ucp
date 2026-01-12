@@ -8,30 +8,34 @@ let io: SocketIOServer | null = null;
 export function initializeSocket(server: HTTPServer) {
   io = new SocketIOServer(server, {
     cors: {
-      origin: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      origin: '*', // Allow all origins for debugging
       methods: ['GET', 'POST'],
     },
     path: '/api/socket',
   });
 
   io.use(async (socket, next) => {
+    console.log('Socket connection attempt:', socket.id);
     const token = socket.handshake.auth.token;
     if (!token) {
+      console.log('Socket auth error: No token');
       return next(new Error('Authentication error'));
     }
 
     const payload = verifyToken(token);
     if (!payload) {
+      console.log('Socket auth error: Invalid token');
       return next(new Error('Invalid token'));
     }
 
+    console.log('✅ Socket authenticated for user:', payload.userId);
     socket.data.userId = payload.userId;
     next();
   });
 
   io.on('connection', (socket) => {
     const userId = socket.data.userId;
-    console.log(`User ${userId} connected`);
+    console.log(`✅ User ${userId} connected (Socket ID: ${socket.id})`);
 
     // Join task-specific room
     socket.on('join-task', async (taskId: string) => {

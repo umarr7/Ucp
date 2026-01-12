@@ -58,58 +58,53 @@ export async function deductPoints(userId: string, amount: number, type: PointTr
   return user.points - amount;
 }
 
-export async function addPoints(userId: string, amount: number, type: PointTransactionType, description?: string, taskId?: string) {
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: userId },
-      data: { points: { increment: amount } },
-    }),
-    prisma.pointTransaction.create({
-      data: {
-        userId,
-        amount,
-        type,
-        description,
-        taskId,
-      },
-    }),
-  ]);
+export async function addPoints(userId: string, amount: number, type: PointTransactionType, description?: string, taskId?: string, tx: any = prisma) {
+  await tx.user.update({
+    where: { id: userId },
+    data: { points: { increment: amount } },
+  });
 
-  const updatedUser = await prisma.user.findUnique({ where: { id: userId } });
+  await tx.pointTransaction.create({
+    data: {
+      userId,
+      amount,
+      type,
+      description,
+      taskId,
+    },
+  });
+
+  const updatedUser = await tx.user.findUnique({ where: { id: userId } });
   return updatedUser?.points || 0;
 }
 
-export async function addReputation(userId: string, change: number, type: ReputationChangeType, description?: string, taskId?: string, ratingId?: string) {
-  const result = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({ where: { id: userId } });
-    if (!user) throw new Error('User not found');
+export async function addReputation(userId: string, change: number, type: ReputationChangeType, description?: string, taskId?: string, ratingId?: string, tx: any = prisma) {
+  const user = await tx.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('User not found');
 
-    const newReputation = user.reputation + change;
-    const newLevel = calculateUserLevel(newReputation);
+  const newReputation = user.reputation + change;
+  const newLevel = calculateUserLevel(newReputation);
 
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        reputation: newReputation,
-        level: newLevel,
-      },
-    });
-
-    await tx.reputationHistory.create({
-      data: {
-        userId,
-        change,
-        type,
-        description,
-        taskId,
-        ratingId,
-      },
-    });
-
-    return { reputation: newReputation, level: newLevel };
+  await tx.user.update({
+    where: { id: userId },
+    data: {
+      reputation: newReputation,
+      level: newLevel,
+    },
   });
 
-  return result;
+  await tx.reputationHistory.create({
+    data: {
+      userId,
+      change,
+      type,
+      description,
+      taskId,
+      ratingId,
+    },
+  });
+
+  return { reputation: newReputation, level: newLevel };
 }
 
 export async function checkCooldown(userId: string): Promise<{ canPost: boolean; waitMinutes?: number }> {

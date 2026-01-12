@@ -6,8 +6,8 @@ export interface AuthenticatedRequest extends NextRequest {
   user?: JWTPayload;
 }
 
-export function withAuth(handler: (req: AuthenticatedRequest) => Promise<NextResponse>) {
-  return async (req: NextRequest) => {
+export function withAuth(handler: (req: AuthenticatedRequest, context?: any) => Promise<NextResponse>) {
+  return async (req: NextRequest, context?: any) => {
     const token = getTokenFromRequest(req);
     
     if (!token) {
@@ -26,20 +26,20 @@ export function withAuth(handler: (req: AuthenticatedRequest) => Promise<NextRes
     }
 
     (req as AuthenticatedRequest).user = payload;
-    return handler(req as AuthenticatedRequest);
+    return handler(req as AuthenticatedRequest, context);
   };
 }
 
 export function withRole(allowedRoles: string[]) {
-  return (handler: (req: AuthenticatedRequest) => Promise<NextResponse>) => {
-    return withAuth(async (req: AuthenticatedRequest) => {
+  return (handler: (req: AuthenticatedRequest, context?: any) => Promise<NextResponse>) => {
+    return withAuth(async (req: AuthenticatedRequest, context?: any) => {
       if (!req.user || !allowedRoles.includes(req.user.role)) {
         return NextResponse.json(
           { error: 'Insufficient permissions' },
           { status: 403 }
         );
       }
-      return handler(req);
+      return handler(req, context);
     });
   };
 }
@@ -48,8 +48,8 @@ export function withRole(allowedRoles: string[]) {
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 export function withRateLimit(maxRequests: number = 60, windowMs: number = 60000) {
-  return (handler: (req: AuthenticatedRequest) => Promise<NextResponse>) => {
-    return async (req: NextRequest) => {
+  return (handler: (req: AuthenticatedRequest, context?: any) => Promise<NextResponse>) => {
+    return async (req: NextRequest, context?: any) => {
       const token = getTokenFromRequest(req);
       const key = token || req.headers.get('x-forwarded-for') || 'anonymous';
       
@@ -77,7 +77,7 @@ export function withRateLimit(maxRequests: number = 60, windowMs: number = 60000
         }
       }
 
-      return handler(req as AuthenticatedRequest);
+      return handler(req as AuthenticatedRequest, context);
     };
   };
 }

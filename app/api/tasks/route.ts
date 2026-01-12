@@ -113,14 +113,14 @@ export const POST = withAuth(withRateLimit(5, 60000)(async (req) => {
       );
     }
 
-    // Check cooldown
-    const cooldown = await checkCooldown(userId);
-    if (!cooldown.canPost) {
-      return NextResponse.json(
-        { error: `Please wait ${cooldown.waitMinutes} minutes before posting another task` },
-        { status: 429 }
-      );
-    }
+    // Check cooldown - REMOVED per user request
+    // const cooldown = await checkCooldown(userId);
+    // if (!cooldown.canPost) {
+    //   return NextResponse.json(
+    //     { error: `Please wait ${cooldown.waitMinutes} minutes before posting another task` },
+    //     { status: 429 }
+    //   );
+    // }
 
     // Check points
     if (user.points < POINTS_CONFIG.REQUIRED_TO_POST) {

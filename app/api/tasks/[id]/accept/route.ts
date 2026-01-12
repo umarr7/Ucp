@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { withAuth } from '@/lib/middleware';
 
-export const POST = withAuth(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const POST = withAuth(async (req: any, { params }: { params: { id: string } }) => {
   try {
     const userId = req.user!.userId;
     const task = await prisma.task.findUnique({
@@ -41,20 +41,20 @@ export const POST = withAuth(async (req: NextRequest, { params }: { params: { id
       );
     }
 
-    // Check if user already has an accepted task
-    const activeTask = await prisma.task.findFirst({
-      where: {
-        acceptorId: userId,
-        status: 'ACCEPTED',
-      },
-    });
+    // Check if user already has an accepted task - REMOVED per user request
+    // const activeTask = await prisma.task.findFirst({
+    //   where: {
+    //     acceptorId: userId,
+    //     status: 'ACCEPTED',
+    //   },
+    // });
 
-    if (activeTask) {
-      return NextResponse.json(
-        { error: 'You already have an active task. Complete it first.' },
-        { status: 400 }
-      );
-    }
+    // if (activeTask) {
+    //   return NextResponse.json(
+    //     { error: 'You already have an active task. Complete it first.' },
+    //     { status: 400 }
+    //   );
+    // }
 
     const updatedTask = await prisma.task.update({
       where: { id: params.id },

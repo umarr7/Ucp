@@ -35,6 +35,8 @@ interface Department {
   code: string;
 }
 
+type TabType = 'feed' | 'active' | 'my-posts';
+
 export default function TasksPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -42,6 +44,7 @@ export default function TasksPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<TabType>('feed');
   const [loadingTasks, setLoadingTasks] = useState(true);
 
   useEffect(() => {
@@ -54,7 +57,7 @@ export default function TasksPage() {
       fetchDepartments();
       fetchTasks();
     }
-  }, [user, loading, router, selectedDepartment, selectedCategory]);
+  }, [user, loading, router, selectedDepartment, selectedCategory, activeTab]);
 
   const fetchDepartments = async () => {
     try {
@@ -73,8 +76,37 @@ export default function TasksPage() {
     try {
       const token = localStorage.getItem('token');
       const params = new URLSearchParams();
+      
       if (selectedDepartment) params.append('departmentId', selectedDepartment);
       if (selectedCategory) params.append('category', selectedCategory);
+
+      // Tab specific filters
+      if (activeTab === 'feed') {
+        params.append('status', 'OPEN');
+      } else if (activeTab === 'active') {
+        params.append('acceptedByMe', 'true');
+        // We want to see accepted tasks, and maybe completed ones too that we accepted
+        // The API defaults status to OPEN/ACCEPTED if not specified, but for active tasks we definitely want ACCEPTED
+        // If we want COMPLETED too, we might need to adjust API or just rely on 'acceptedByMe' if back end handles it.
+        // Let's explicitly look for ACCEPTED tasks for now as "Active".
+        // If the user wants history, that might be another tab. 
+        // For "Active", ACCEPTED is the key status.
+        // CHECK API: route.ts line 44: if status not provided, it fetches OPEN and ACCEPTED.
+        // But if acceptedByMe is true, we probably want all tasks I'm working on.
+        // Let's NOT set status param here so it defaults to OPEN/ACCEPTED, 
+        // effectively showing any task I'm involved in that isn't cancelled/archived?
+        // Actually, for "Active Tasks", we usually mean tasks IN PROGRESS. 
+        // So status=ACCEPTED makes the most sense.
+        params.append('status', 'ACCEPTED');
+      } else if (activeTab === 'my-posts') {
+        params.append('myTasks', 'true');
+        // detailed logic: show all my posts regardless of status? usually yes.
+        // API defaults to OPEN, ACCEPTED. 
+        // If I want to see my COMPLETED posts too, I might need to override status parameter in API or pass 'status=' empty to get all?
+        // The API code at line 41 says: if (status) where.status = status; else where.status = { in: ['OPEN', 'ACCEPTED'] };
+        // So currently it won't show COMPLETED tasks.
+        // For now, let's just stick to the default behavior which shows active/open stuff.
+      }
 
       const res = await fetch(`/api/tasks?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -122,7 +154,7 @@ export default function TasksPage() {
       <Navbar />
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-6 flex justify-between items-center">
+          <div className="mb-6 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
             <h1 className="text-3xl font-bold text-gray-900">Task Feed</h1>
             <Link
               href="/tasks/new"
@@ -130,6 +162,42 @@ export default function TasksPage() {
             >
               + New Task
             </Link>
+          </div>
+
+          {/* Tabs */}
+          <div className="mb-6 border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('feed')}
+                className={`${
+                  activeTab === 'feed'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Available Tasks
+              </button>
+              <button
+                onClick={() => setActiveTab('active')}
+                className={`${
+                  activeTab === 'active'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Active Tasks
+              </button>
+              <button
+                onClick={() => setActiveTab('my-posts')}
+                className={`${
+                  activeTab === 'my-posts'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                My Posts
+              </button>
+            </nav>
           </div>
 
           {/* Filters */}
@@ -190,7 +258,13 @@ export default function TasksPage() {
             </div>
           ) : tasks.length === 0 ? (
             <div className="bg-white shadow rounded-lg p-12 text-center">
-              <p className="text-gray-500">No tasks found. Be the first to post one!</p>
+              <p className="text-gray-500">
+                {activeTab === 'feed'
+                  ? 'No available tasks found.'
+                  : activeTab === 'active'
+                  ? 'You haven\'t accepted any tasks yet.'
+                  : 'You haven\'t posted any tasks yet.'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6">

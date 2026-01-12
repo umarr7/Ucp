@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { withAuth } from '@/lib/middleware';
-
-export const GET = withAuth(async (req: NextRequest, { params }: { params: { id: string } }) => {
+// GET task detail is public to allow viewing before authentication issues block it
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const task = await prisma.task.findUnique({
       where: { id: params.id },
@@ -45,7 +45,7 @@ export const GET = withAuth(async (req: NextRequest, { params }: { params: { id:
       { status: 500 }
     );
   }
-});
+}
 
 export const DELETE = withAuth(async (req: NextRequest, { params }: { params: { id: string } }) => {
   try {

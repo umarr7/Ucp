@@ -38,29 +38,38 @@ export default function Chat({ taskId, requesterId, acceptorId }: ChatProps) {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    // Initialize socket connection
-    const socketUrl = typeof window !== 'undefined' 
-      ? (process.env.NEXT_PUBLIC_APP_URL || window.location.origin)
-      : 'http://localhost:3000';
-    const newSocket = io(socketUrl, {
+    // Initialize socket connection - use full origin with protocol
+    const newSocket = io(window.location.origin, {
       auth: { token },
       path: '/api/socket',
+      transports: ['websocket', 'polling'], // Try websocket first
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     newSocket.on('connect', () => {
+      console.log('✅ Socket connected!', newSocket.id);
       setConnected(true);
       newSocket.emit('join-task', taskId);
     });
 
     newSocket.on('disconnect', () => {
+      console.log('❌ Socket disconnected');
       setConnected(false);
     });
 
+    newSocket.on('connect_error', (error) => {
+      console.error('🔴 Socket connection error:', error.message);
+    });
+
     newSocket.on('joined-task', () => {
+      console.log('✅ Joined task room:', taskId);
       fetchMessages();
     });
 
     newSocket.on('new-message', (message: Message) => {
+      console.log('📩 New message received:', message);
       setMessages((prev) => [...prev, message]);
       scrollToBottom();
     });
