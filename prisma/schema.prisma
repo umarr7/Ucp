@@ -1,0 +1,175 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  password      String
+  role          String      @default("USER") // USER, TRUSTED, ADMIN
+  level         String      @default("NEW") // NEW, BRONZE, SILVER, GOLD, ELITE
+  points        Int         @default(0)
+  reputation    Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  lastTaskPostAt DateTime?
+  
+  profile       Profile?
+  tasksPosted   Task[]      @relation("TaskRequester")
+  tasksAccepted Task[]      @relation("TaskAcceptor")
+  sentMessages  Message[]   @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageReceiver")
+  ratingsGiven  Rating[]    @relation("RatingGiver")
+  ratingsReceived Rating[]   @relation("RatingReceiver")
+  pointTransactions PointTransaction[]
+  reputationHistory ReputationHistory[]
+  department    Department? @relation("UserDepartment", fields: [departmentId], references: [id])
+  departmentId  String?
+  
+  @@index([email])
+  @@index([reputation])
+  @@index([departmentId])
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String
+  studentId   String?  @unique
+  phone       String?
+  bio         String?
+  avatar      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  
+  users       User[]   @relation("UserDepartment")
+  tasks       Task[]
+  
+  @@index([code])
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  title         String
+  description   String
+  category      String       // ERRAND, LOST, BOOK, TUTORING, OTHER
+  departmentId  String
+  department    Department   @relation(fields: [departmentId], references: [id])
+  requesterId   String
+  requester     User         @relation("TaskRequester", fields: [requesterId], references: [id])
+  acceptorId    String?
+  acceptor      User?        @relation("TaskAcceptor", fields: [acceptorId], references: [id])
+  status        String       @default("OPEN") // OPEN, ACCEPTED, COMPLETED, CANCELLED, EXPIRED
+  urgency       String       @default("MEDIUM") // LOW, MEDIUM, HIGH
+  rewardPoints  Int
+  latitude      Float?
+  longitude     Float?
+  locationText  String?
+  imageUrl      String?
+  expiresAt     DateTime
+  isResolved    Boolean      @default(false)
+  isFeatured    Boolean      @default(false)
+  isSponsored   Boolean      @default(false)
+  isBoosted     Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  acceptedAt    DateTime?
+  completedAt  DateTime?
+  
+  messages      Message[]
+  ratings       Rating[]
+  
+  @@index([requesterId])
+  @@index([acceptorId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@index([isFeatured])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id])
+  receiverId  String
+  receiver    User     @relation("MessageReceiver", fields: [receiverId], references: [id])
+  content     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  @@index([taskId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
+
+model Rating {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  giverId     String
+  giver       User     @relation("RatingGiver", fields: [giverId], references: [id])
+  receiverId  String
+  receiver    User     @relation("RatingReceiver", fields: [receiverId], references: [id])
+  score       Int      // 1-5
+  comment     String?
+  createdAt   DateTime @default(now())
+  
+  @@unique([taskId, giverId])
+  @@index([receiverId])
+  @@index([score])
+}
+
+model PointTransaction {
+  id          String              @id @default(cuid())
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int                 // positive for earned, negative for spent
+  type        String              // TASK_POSTED, TASK_COMPLETED, TASK_CANCELLED, ADMIN_ADJUSTMENT
+  description String?
+  taskId      String?
+  createdAt   DateTime            @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+}
+
+model ReputationHistory {
+  id          String              @id @default(cuid())
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  change      Int                 // positive for increase, negative for decrease
+  type        String              // TASK_COMPLETED, POSITIVE_RATING, NEGATIVE_RATING, ADMIN_ADJUSTMENT
+  description String?
+  taskId      String?
+  ratingId    String?
+  createdAt   DateTime            @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+}
